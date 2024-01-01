@@ -130,19 +130,31 @@ class Observation : public Point {
         // Note: because this is the root node, we will not aggregrate the strategy.
         //  If we were to, we would take the convex hull of the child strategies.
         //
-        virtual void next_strategy() {};
+        virtual void next_strategy();
         virtual double* observe_utility();
         virtual void print() { /*cout << my_name << endl;*/ }
 
 };
 
+// Update the strategy based on the regrets accumulated in the
+// observe_utility pass.
+//
+// Note: no regrets are kept for the observation node, so we simply
+//       update the child strategies.
+// 
+void Observation::next_strategy() {
+    for (auto child : my_children) {
+        child->next_strategy();
+    }
+}
+
+
 // Observation point
 //
-// Observe their player's card.
+// Each child of this point represents a different outcome of the dealt cards.
+// 2 players * 3 cards = 6 outcomes of the observation.
 //
-// This card value is then passed to the decision points lower in the game tree.
-//
-// nullptr is returned as its assumed the observation nodes are at the top of the game tree.
+// nullptr is returned as its assumed the observation node is at the top of the game tree.
 //
 double* Observation::observe_utility() {
     // Each child node represents a different outcome of the observation.
@@ -191,6 +203,10 @@ class Decision : public Point {
 // Update the strategy for the player at this decision point
 // using the current regret values.
 //
+// Note: there will be repetitive assignments as there are two decision points
+//       for each infoset. This is just wasted computation and does not affect
+//       the final answer.
+//
 template <typename T>
 void Decision<T>::next_strategy() {
     // Temporary array to hold intermediary calculations
@@ -200,10 +216,10 @@ void Decision<T>::next_strategy() {
     // Get the infoset that this decision point belongs to.
     Infoset* my_infoset = infosets[my_player][my_facing_bet][my_card];
     // Zero out negative regrets
-    int sum = 0;
+    double sum = 0.;
     for (auto action : my_actions) {
         theta[action] = max(my_infoset->regret(action), 0.);
-        sum += theta[action];
+        sum = sum + theta[action];
     }
     // If all regrets are non-positive, then select a random strategy.
     if (sum == 0) {
@@ -216,9 +232,15 @@ void Decision<T>::next_strategy() {
     for (auto action : my_actions) {
         my_infoset->update_strategy(action, theta[action]/sum);
     }
+    // Update the strategy of the child points.
+    for (auto child : my_children) {
+        child->next_strategy();
+    }
 }
 
 // Observe utility for the decision node.
+//
+// This function accumulates the regret at this decision point.
 //
 // Note:
 // The decision node for one player is an observation node for the other.
@@ -250,8 +272,6 @@ double* Decision<T>::observe_utility() {
         ev += my_infoset->strategy(action) * utilities[action];
     for (auto action : my_actions)
         my_infoset->update_regret(action, my_infoset->regret(action) + (utilities[action] - ev));
-    // Update strategy
-    next_strategy();
     // Return the observed utilities for the two players
     double* result = (double*) malloc(2 * sizeof(double));
     result[my_player] = ev;
@@ -451,6 +471,7 @@ int main(int argc, char* argv[]) {
     cout << endl << endl << endl;
     for (int i=0; i<N_ITERS; i++) {
         root->observe_utility();
+        root->next_strategy();
         print_tree(root);
     }
     
