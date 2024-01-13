@@ -128,7 +128,7 @@ class Point {
         // Member functions
         //
         virtual void next_strategy() = 0;
-        virtual double* observe_utility(double reach_probs[N_PLAYERS]) = 0;
+        virtual double observe_utility(const double reach_probs[N_PLAYERS]) = 0;
         void add_child(Point* child) {
             my_children.push_back(child);
         }
@@ -152,7 +152,7 @@ class Observation : public Point {
         //  If we were to, we would take the convex hull of the child strategies.
         //
         virtual void next_strategy() {}
-        virtual double* observe_utility(double reach_probs[N_PLAYERS]);
+        virtual double observe_utility(const double reach_probs[N_PLAYERS]);
         virtual void print() { /*cout << my_name << endl;*/ }
 
 };
@@ -164,13 +164,12 @@ class Observation : public Point {
 //
 // nullptr is returned as its assumed the observation node is at the top of the game tree.
 //
-double* Observation::observe_utility(double reach_probs[N_PLAYERS]) {
+double Observation::observe_utility(const double reach_probs[N_PLAYERS]) {
     // Each child node represents a different outcome of the observation.
     // Observe the utility of each child.
     //
-    double* res = my_children[rand() % my_children.size()]->observe_utility(reach_probs);
-    free(res);
-    return nullptr; // Root node - no need to bubble up a utility.
+    my_children[rand() % my_children.size()]->observe_utility(reach_probs);
+    return 0.; // Root node - no need to bubble up a utility.
 }
 
 // Decision point
@@ -201,7 +200,7 @@ class Decision : public Point {
 
         // Member functions
         virtual void next_strategy();
-        virtual double* observe_utility(double reach_probs[N_PLAYERS]);
+        virtual double observe_utility(const double reach_probs[N_PLAYERS]);
         void print();
 };
 
@@ -248,47 +247,48 @@ void Decision<T>::next_strategy() {
 // The utility for the opposing player is summed and passed to the parent node.
 //
 template<typename T>
-double* Decision<T>::observe_utility(double reach_probs[N_PLAYERS]) {
+double Decision<T>::observe_utility(const double reach_probs[N_PLAYERS]) {
     // Get the card for the player owning this decision.
     card_t my_card = (my_player ? my_p2_card : my_p1_card);
     // Get the infoset that this decision point belongs to.
     Infoset* my_infoset = infosets[my_player][my_facing_bet][my_card];
     // Prob. of reaching the child node, assuming the given player is playing towards it.
     double next_reach_probs[N_PLAYERS] = {1., 1.}; 
-    // Utility vectors
-    double utilities[N_ACTIONS];        // Stores the utility observed for each action.
-    double* child_utilities; // Utility returned by the child node.
-    // Initialize ev for each player.
-    //     Accumulates the opposing player's utilities into a sum.
-    //     And, accumulates our player's ev.
-    double* ev = (double*) malloc(N_PLAYERS * sizeof(double));
-    ev[Player1] = 0.; 
-    ev[Player2] = 0.;
+    // Stores the utility observed for each action.
+    double utilities[N_ACTIONS];  
+    // Accumulates the ev for this infoset.
+    double ev = 0.;
     // Each child is associated with an action, numbered [0, N_ACTIONS].
     int action = 0;
     for (auto child : my_children) {
         // Compute reach probabilities for this child.
         next_reach_probs[my_player] = reach_probs[my_player] * my_infoset->strategy(action);
         next_reach_probs[!my_player] = reach_probs[!my_player];
-        // Observe the utilities for this child.
-        child_utilities = child->observe_utility(next_reach_probs);
-        // Save the utility gained from our player playing this action.
-        utilities[action] = child_utilities[my_player];
-        // Compute the ev contribution for this action, for each player.
-        ev[my_player] += my_infoset->strategy(action) * utilities[my_player];
-        ev[!my_player] += child_utilities[!my_player];
-        // No longer need the memory returned by the child.
-        free(child_utilities);
+        // Observe the utility for this child.
+        // Flip sign of utility depending on which player owns this decision node.
+        utilities[action] = (my_player ? -1. : 1.) * child->observe_utility(next_reach_probs);
+        // Add the ev contribution for this action
+        ev += my_infoset->strategy(action) * utilities[my_player];
+        action++;
     }
     // Update regrets and commulative strategy totals
     for (auto action : my_actions) {
-        my_infoset->add_regret(action, reach_probs[!my_player] * (utilities[action] - ev[my_player]));
+        /*
+        if (my_name == "j8") {
+            cout << "---" << endl;
+            //cout << reach_probs[!my_player] << endl;
+            cout << action_to_str(action) << ": " << utilities[action] << endl;
+            //cout << ev << endl;
+        }
+        */
+        my_infoset->add_regret(action,  reach_probs[!my_player] * (utilities[action] - ev));
         my_infoset->add_cumm_strategy(action, reach_probs[my_player] * my_infoset->strategy(action));
     }
     // Update the strategy at this infoset.
     next_strategy();
     // Return the observed EVs
-    return ev;
+    // Flip sign back to always return EVs wrt Player1.
+    return (my_player ? -1. : 1.) * ev;
 }
 
 template<typename T>
@@ -331,18 +331,11 @@ class Terminal : public Point {
             my_name = name;
             my_type = terminal_t;
         }
-        virtual double* observe_utility(double reach_probs[N_PLAYERS]);
+        virtual double observe_utility(const double reach_probs[N_PLAYERS]) { return my_payout; }
         virtual void next_strategy() {};
         void add_child(Point* child) {};
         virtual void print() { /*cout << my_name << endl;*/ }
 };
-
-double* Terminal::observe_utility(double reach_probs[N_PLAYERS]) {
-    double* result =  (double*) malloc(N_PLAYERS * sizeof(double));
-    result[Player1] = my_payout;
-    result[Player2] = -1 * my_payout;
-    return result;
-}
 
 // Game tree initialization functions
 //
@@ -410,10 +403,10 @@ Observation* init_tree() {
     j6->add_child(j18);
     //
     // Tree Depth 3 - Check-Check Terminal Nodes + Player 1 response actions
-    Terminal* plus_two  = new Terminal("+2", 2);
-    Terminal* plus_one  = new Terminal("+1", 1);
-    Terminal* minus_one = new Terminal("-1", -1);
-    Terminal* minus_two = new Terminal("-2", -2);
+    Terminal* plus_two  = new Terminal("+2", 2.);
+    Terminal* plus_one  = new Terminal("+1", 1.);
+    Terminal* minus_one = new Terminal("-1", -1.);
+    Terminal* minus_two = new Terminal("-2", -2.);
     Decision<second_action_t>* j19 = new Decision("j19", Player1, Jack,  Queen, true, second_actions);
     Decision<second_action_t>* j20 = new Decision("j20", Player1, Jack,  King,  true, second_actions);
     Decision<second_action_t>* j21 = new Decision("j21", Player1, Queen, Jack,  true, second_actions);
@@ -477,18 +470,16 @@ void print_tree(Point* root) {
 }
 
 // Number of iterations
-int N_ITERS = 1000;
+int N_ITERS = 1000000;
 
 int main(int argc, char* argv[]) {
     Observation* root = init_tree();
     print_tree(root);
     cout << endl << endl << endl;
-    double ones[N_PLAYERS] = {1., 1.};
+    const double ones[N_PLAYERS] = {1., 1.};
     for (int i=0; i<N_ITERS; i++) {
         root->observe_utility(ones);
-        root->next_strategy();
-        print_tree(root);
     }
-    
+    print_tree(root);
     return 0;
 }
