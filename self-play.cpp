@@ -210,6 +210,7 @@ class Decision : public Point {
 // Note: there will be repetitive assignments as there are two decision points
 //       for each infoset. This is just wasted computation and does not affect
 //       the final answer.
+//       (Is this still true?)
 //
 template <typename T>
 void Decision<T>::next_strategy() {
@@ -225,10 +226,10 @@ void Decision<T>::next_strategy() {
         theta[action] = max(my_infoset->regret(action), 0.);
         sum = sum + theta[action];
     }
-    // If all regrets are non-positive, then select a random strategy.
+    // If all regrets are non-positive, then select a uniform, mixed strategy.
     if (sum == 0) {
         for (auto action : my_actions) {
-            theta[action] = (double) rand(); // random integer [0-32767]
+            theta[action] = 1.;
             sum += theta[action];
         }
     }
@@ -268,10 +269,10 @@ double Decision<T>::observe_utility(const double reach_probs[N_PLAYERS]) {
         // Flip sign of utility depending on which player owns this decision node.
         utilities[action] = (my_player ? -1. : 1.) * child->observe_utility(next_reach_probs);
         // Add the ev contribution for this action
-        ev += my_infoset->strategy(action) * utilities[my_player];
+        ev += my_infoset->strategy(action) * utilities[action];
         action++;
     }
-    // Update regrets and commulative strategy totals
+    // Update regrets
     for (auto action : my_actions) {
         /*
         if (my_name == "j8") {
@@ -282,10 +283,13 @@ double Decision<T>::observe_utility(const double reach_probs[N_PLAYERS]) {
         }
         */
         my_infoset->add_regret(action,  reach_probs[!my_player] * (utilities[action] - ev));
-        my_infoset->add_cumm_strategy(action, reach_probs[my_player] * my_infoset->strategy(action));
     }
     // Update the strategy at this infoset.
     next_strategy();
+    // Update cummulative strategy
+    for (auto action : my_actions) {
+        my_infoset->add_cumm_strategy(action, reach_probs[my_player] * my_infoset->strategy(action));
+    }
     // Return the observed EVs
     // Flip sign back to always return EVs wrt Player1.
     return (my_player ? -1. : 1.) * ev;
@@ -474,8 +478,6 @@ int N_ITERS = 1000000;
 
 int main(int argc, char* argv[]) {
     Observation* root = init_tree();
-    print_tree(root);
-    cout << endl << endl << endl;
     const double ones[N_PLAYERS] = {1., 1.};
     for (int i=0; i<N_ITERS; i++) {
         root->observe_utility(ones);
