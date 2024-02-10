@@ -162,11 +162,11 @@ class Observation : public Point {
 // Each child of this point represents a different outcome of the dealt cards.
 // 2 players * 3 cards = 6 outcomes of the observation.
 //
-// nullptr is returned as its assumed the observation node is at the top of the game tree.
+//  Zero is returned as its assumed the observation node is at the top of the game tree.
 //
 double Observation::observe_utility(const double reach_probs[N_PLAYERS]) {
     // Each child node represents a different outcome of the observation.
-    // Observe the utility of each child.
+    // Observe the utility for a randomly selected child.
     //
     my_children[rand() % my_children.size()]->observe_utility(reach_probs);
     return 0.; // Root node - no need to bubble up a utility.
