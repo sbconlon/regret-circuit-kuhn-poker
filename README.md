@@ -3,7 +3,10 @@
  <br/><br/>
  Inspired by [Regret Circuits: Composability of Regret Minimizers](https://arxiv.org/pdf/1811.02540.pdf).
 <br/><br/>
+
 ***
+<img src="https://github.com/sbconlon/regret-circuit-kuhn-poker/blob/main/images/construction.gif" width="25%">
+
 **Under construction!**
 ***
 ### 1. Kuhn Poker
@@ -37,5 +40,8 @@ To reflect this many-to-one relationship of decision points to infoset in the co
 
 Each infoset is uniquely determined by three values: the player who is making the decision, whether or not that player is facing a bet, and the card that the player holds. This is shown in the global array of infoset pointers that is defined in the code. Note, this array is made global to allow each decision point to access it. Training is done sequentially, so there is no need to worry about race conditions. <br/><br/>
 ![Array of infosets](./images/infoset-array.JPG)
+
+### 2.5. Points
+
 
 
