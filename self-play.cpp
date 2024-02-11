@@ -207,11 +207,6 @@ class Decision : public Point {
 // Update the strategy for the player at this decision point
 // using the current regret values.
 //
-// Note: there will be repetitive assignments as there are two decision points
-//       for each infoset. This is just wasted computation and does not affect
-//       the final answer.
-//       (Is this still true?)
-//
 template <typename T>
 void Decision<T>::next_strategy() {
     // Temporary array to hold intermediary calculations
