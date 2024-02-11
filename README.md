@@ -5,10 +5,6 @@
 <br/><br/>
 
 ***
-<img src="https://github.com/sbconlon/regret-circuit-kuhn-poker/blob/main/images/construction.gif" width="25%">
-
-**Under construction!**
-***
 ### 1. Kuhn Poker
 See the Wikipedia [page](https://en.wikipedia.org/wiki/Kuhn_poker) for a comprehensive description of the game. <br/><br/>
 
@@ -79,6 +75,55 @@ For Kuhn Poker, each decision point is uniquely identified by the players' cards
 
 The decision class:<br/><br/>
 ![Decision point class code snippet](./images/decision-point.JPG)
+
+The `observe_utility` function for the decision class does the following: <br/>
+- On the downward traversal, the player passes the counterfactual reach probability to the child points (i.e. the probability of reaching the children points assuming the player is playing to reach the children points). <br/><br/>
+- On the upward traversal, the player uses the utilities returned by the children as well as the player's strategy to compute a counterfactual value for the infoset, scaled by the counterfactual reach probability passed to it by its parent point. This counterfactual value is then used to compute the counterfactual regret for each available action (i.e. the value of only playing that action versus the counterfactual value of the infoset given the player's current strategy). <br/><br/>
+![Decision point observe utility code snippet](./images/decision-observe-utility.JPG)
+
+The `next_strategy` function for the decision class takes the regrets accumulated by the `observe_utility` function and performs the regret matching algorithm to update the player's strategy at this infoset.
+![Decision point uupdate strategy code snippet](./images/decision-next-strategy.JPG)
+
+### 2.8. Terminal Points
+Terminal points are the leafs of the game tree that return payouts to the player's. <br/><br/>
+
+The terminal class:<br/><br/>
+![Terminal point code snippet](./images/terminal-point.JPG)
+
+The `observe_utility` function simply returns the payout with respect to Player 1.<br/><br/>
+
+The `next_strategy` function is void. <br/><br/>
+
+### 2.9. Game Tree Initializations
+See the functions `init_infosets` and `init_tree` for the initialization of the infoset and game tree objects. <br/><br/>
+
+### 2.10. Main
+The main function of this program loops over `observe_utility` calls to the root of the game tree. This executes the CFR algorithm and allows the players to adjust their strategies until an equilibrium is achieved.<br/><br/>
+![Main code snippet](./images/main.JPG)
+
+### 3. Results
+Below is an example output of the player's strategies at each decision node after 1000000 iterations.<br/><br/>
+
+![Example output](./images/output.JPG)
+
+This result agrees with the known equilibrium solution to Kuhn Poker.
+
+### 4. References
+Gabriele Farina, Christian Kroer, Tuomas Sandholm. Regret Circuits: Composibility of Regret Minimizers.
+http://arxiv.org/abs/1811.02540.<br/><br/>
+
+Todd W. Neller, Marc Lanctot. An Introduction to Counterfactual Regret Minimization.
+https://www.ma.imperial.ac.uk/~dturaev/neller-lanctot.pdf. <br/><br/>
+
+Marc Lanctot, Kevin Waugh, Martin Zinkevich, and Michael Bowling. Monte carlo sampling
+for regret minimization in extensive games. In Y. Bengio, D. Schuurmans, J. Lafferty, C. K. I.
+Williams, and A. Culotta, editors, Advances in Neural Information Processing Systems 22, pages
+1078–1086. MIT Press, 2009.<br/><br/>
+
+Martin Zinkevich, Michael Johanson, Michael Bowling, and Carmelo Piccione. Regret minimization
+in games with incomplete information. In J.C. Platt, D. Koller, Y. Singer, and S. Roweis, editors,
+Advances in Neural Information Processing Systems 20, pages 1729–1736. MIT Press, Cambridge,
+MA, 2008.<br/><br/>
 
 
 
